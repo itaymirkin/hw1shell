@@ -48,6 +48,11 @@ void cleanup_finished_processes() {
         pid_t result = waitpid(bg_processes[i].pid, &status, WNOHANG);
         
         if (result > 0) {
+<<<<<<< HEAD
+=======
+            
+            //git check
+>>>>>>> 024e89a (Init Commit)
             printf("hw1shell: pid %d finished\n", bg_processes[i].pid);
             // Remove process from array by shifting remaining elements
             for (int j = i; j < num_bg_processes - 1; j++) {
