@@ -21,12 +21,68 @@ int num_bg_processes = 0;
 // Function to parse command line into arguments
 int parse_command(char *line, char **args) {
     int argc = 0;
-    char *token = strtok(line, " \t\n");
+    int i = 0;
     
-    while (token != NULL && argc < MAX_ARGS - 1) {
-        args[argc++] = token;
-        token = strtok(NULL, " \t\n");
+    while (line[i] != '\0') {
+        // Skip whitespace
+        while (line[i] == ' ' || line[i] == '\t' || line[i] == '\n') {
+            i++;
+        }
+        
+        // Break if we've reached the end
+        if (line[i] == '\0') {
+            break;
+        }
+        
+        //new arg
+        int capacity = 1;
+        int j = 0;
+        char *curr_arg = (char*)malloc(capacity + 1);  // +1 for null terminator
+        
+        if (!curr_arg) {
+            //remove
+            printf("Memory allocation failed\n");
+            for (int k = 0; k < argc; k++) {
+                free(args[k]);
+            }
+            return -1;
+        }
+        
+        // Copy characters until whitespace or EOS
+        while (line[i] != ' ' && line[i] != '\t' && line[i] != '\n' && line[i] != '\0') {
+            if (j >= capacity) {
+                capacity *= 2;
+                char *temp = (char*)realloc(curr_arg, capacity + 1);
+                
+                if (!temp) {
+                    //remove print
+                    printf("Memory reallocation failed\n");
+                    free(curr_arg);
+                    for (int k = 0; k < argc; k++) {
+                        free(args[k]);
+                    }
+                    return -1;
+                }
+                curr_arg = temp;
+            }
+            
+            curr_arg[j++] = line[i++];
+        }
+        
+
+        curr_arg[j] = '\0';
+        //TODO: Remove - only for debug/////////////////////////
+        printf("arg number %d is %s\n", argc, curr_arg);
+        // Store the arg
+        if (argc < MAX_ARGS - 1) {
+            args[argc++] = curr_arg;
+        } else {
+            free(curr_arg);
+            break;
+        }
     }
+    
+    // Null terminate the args list
     args[argc] = NULL;
     return argc;
 }
@@ -45,22 +101,26 @@ void cleanup_finished_processes() {
     int i = 0;
     while (i < num_bg_processes) {
         int status;
-        pid_t result = waitpid(bg_processes[i].pid, &status, WNOHANG);
+        pid_t finish = waitpid(bg_processes[i].pid, &status, WNOHANG);
         
-        if (result > 0) {
+        if (finish > 0) {
 
-            printf("hw1shell: pid %d finished\n", bg_processes[i].pid);
+            printf("\nhw1shell: pid %d finished\n", bg_processes[i].pid);
+            fflush(stdout);
             // Remove process from array by shifting remaining elements
             for (int j = i; j < num_bg_processes - 1; j++) {
                 bg_processes[j] = bg_processes[j + 1];
             }
             num_bg_processes--;
-        } else if (result < 0 && errno != ECHILD) {
-            printf("hw1shell: waitpid failed, errno is %d\n", errno);
+            continue;
+        } else if (finish < 0 && errno != ECHILD) {
+            printf("\nhw1shell: waitpid failed, errno is %d\n", errno);
         } else {
             i++;
         }
+        
     }
+    
 }
 
 // Function to add background process to array
@@ -83,7 +143,8 @@ void handle_cd(char **args) {
     if (getcwd(path, sizeof(path)) != NULL) {
         if (args[1] == NULL)
         {
-            printf("hw1shell: invalid command\n");
+            printf("\nhw1shell: invalid command\n");
+            fflush(stdout);
         }
         else {
              //printf("args[1]: %s\n", args[1]);
@@ -91,6 +152,9 @@ void handle_cd(char **args) {
              {
                  getcwd(path, sizeof(path));
                  //printf("Current working dir after change: %s\n", path);
+             }
+             else {
+                printf("\nhw1shell: invalid command\n");
              }
         }
         
@@ -105,13 +169,31 @@ void handle_jobs() {
     }
 }
 
+// Signal handler for SIGCHLD
+void sigchld_handler(int sig) {
+    sigchld_received = 1;  // Set flag when SIGCHLD is received
+}
+
 int main() {
     char line[MAX_LINE];
     char *args[MAX_ARGS];
+
+        
     while (1) {
+        
+       if (sigchld_received) {
+            cleanup_finished_processes();  // Clean up background processes
+            sigchld_received = 0;          // Reset the flag
+        }
+      
+             
         // Print prompt
         printf("hw1shell$ ");
         fflush(stdout);
+        // Clean up any finished background processes and send notiflication 
+        
+        
+        
         
         // Read command
         
@@ -185,6 +267,7 @@ int main() {
                 // Add to background processes array
                 if (add_background_process(pid, line) == 0) {
                     printf("hw1shell: pid %d started\n", pid);
+                    fflush(stdout);
                 }
             } else {
                 // Wait for foreground process to complete
