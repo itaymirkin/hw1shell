@@ -170,9 +170,9 @@ void handle_jobs() {
 }
 
 // Signal handler for SIGCHLD
-void sigchld_handler(int sig) {
-    sigchld_received = 1;  // Set flag when SIGCHLD is received
-}
+// void sigchld_handler(int sig) {
+//     sigchld_received = 1;  // Set flag when SIGCHLD is received
+// }
 
 int main() {
     char line[MAX_LINE];
@@ -181,10 +181,10 @@ int main() {
         
     while (1) {
         
-       if (sigchld_received) {
-            cleanup_finished_processes();  // Clean up background processes
-            sigchld_received = 0;          // Reset the flag
-        }
+    //    if (sigchld_received) {
+    //         cleanup_finished_processes();  // Clean up background processes
+    //         sigchld_received = 0;          // Reset the flag
+    //     }
       
              
         // Print prompt
@@ -201,6 +201,7 @@ int main() {
             if (feof(stdin)) {
                 break;  // Exit on EOF
             }
+            cleanup_finished_processes();
             continue;
         }
         
@@ -209,12 +210,17 @@ int main() {
         
         // Skip empty lines
         if (strlen(line) == 0) {
+            cleanup_finished_processes();            
             continue;
         }
         
         // Parse command
         int argc = parse_command(line, args);
-        if (argc == 0) continue;
+        if (argc == 0)  {
+            cleanup_finished_processes();
+            continue;
+        }
+        
         
         // Handle exit command
         if (strcmp(args[0], "exit") == 0) {
@@ -231,12 +237,14 @@ int main() {
         // Handle cd command
         if (strcmp(args[0], "cd") == 0) {
             handle_cd(args);
+            cleanup_finished_processes();
             continue;
         }
         
         // Handle jobs command
         if (strcmp(args[0], "jobs") == 0) {
             handle_jobs();
+            cleanup_finished_processes();
             continue;
         }
         
