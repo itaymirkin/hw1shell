@@ -18,18 +18,16 @@ typedef struct {
 BackgroundProcess bg_processes[MAX_BG_PROCESSES];
 int num_bg_processes = 0;
 
-// Function to parse command line into arguments
+// parse command line into args
 int parse_command(char *line, char **args) {
     int argc = 0;
     int i = 0;
     
     while (line[i] != '\0') {
-        // Skip whitespace
         while (line[i] == ' ' || line[i] == '\t' || line[i] == '\n') {
             i++;
         }
-        
-        // Break if we've reached the end
+
         if (line[i] == '\0') {
             break;
         }
@@ -37,8 +35,7 @@ int parse_command(char *line, char **args) {
         //new arg
         int capacity = 1;
         int j = 0;
-        char *curr_arg = (char*)malloc(capacity + 1);  // +1 for null terminator
-        
+        char *curr_arg = (char*)malloc(capacity + 1);  // +1 for null 
         if (!curr_arg) {
             //remove
             printf("Memory allocation failed\n");
@@ -47,15 +44,12 @@ int parse_command(char *line, char **args) {
             }
             return -1;
         }
-        
-        // Copy characters until whitespace or EOS
         while (line[i] != ' ' && line[i] != '\t' && line[i] != '\n' && line[i] != '\0') {
             if (j >= capacity) {
                 capacity *= 2;
                 char *temp = (char*)realloc(curr_arg, capacity + 1);
                 
                 if (!temp) {
-                    //remove print
                     printf("Memory reallocation failed\n");
                     free(curr_arg);
                     for (int k = 0; k < argc; k++) {
@@ -72,8 +66,7 @@ int parse_command(char *line, char **args) {
 
         curr_arg[j] = '\0';
         //TODO: Remove - only for debug/////////////////////////
-        printf("arg number %d is %s\n", argc, curr_arg);
-        // Store the arg
+        //printf("arg number %d is %s\n", argc, curr_arg);
         if (argc < MAX_ARGS - 1) {
             args[argc++] = curr_arg;
         } else {
@@ -81,33 +74,31 @@ int parse_command(char *line, char **args) {
             break;
         }
     }
-    
-    // Null terminate the args list
+    // null terminate 
     args[argc] = NULL;
     return argc;
 }
 
-// Function to check if command should run in background
-int is_background_command(char **args, int argc) {
+//command should is background?
+int is_bg(char **args, int argc) {
     if (argc > 0 && strcmp(args[argc-1], "&") == 0) {
-        args[argc-1] = NULL;  // Remove & from arguments
+        args[argc-1] = NULL; //Remove & from agrs - Already been used   
         return 1;
     }
     return 0;
 }
 
-// Function to clean up finished background processes
-void cleanup_finished_processes() {
+// clean_finished background processes
+void clean_bg() {
     int i = 0;
     while (i < num_bg_processes) {
         int status;
         pid_t finish = waitpid(bg_processes[i].pid, &status, WNOHANG);
         
         if (finish > 0) {
-
             printf("\nhw1shell: pid %d finished\n", bg_processes[i].pid);
             fflush(stdout);
-            // Remove process from array by shifting remaining elements
+            //shifting remaining elems
             for (int j = i; j < num_bg_processes - 1; j++) {
                 bg_processes[j] = bg_processes[j + 1];
             }
@@ -120,11 +111,10 @@ void cleanup_finished_processes() {
         }
         
     }
-    
 }
 
-// Function to add background process to array
-int add_background_process(pid_t pid, char *command) {
+//add bg process to array
+int add_to_bg(pid_t pid, char *command) {
     if (num_bg_processes >= MAX_BG_PROCESSES) {
         return -1;
     }
@@ -137,7 +127,7 @@ int add_background_process(pid_t pid, char *command) {
     return 0;
 }
 
-// Function to implement built-in cd command
+//  cd command
 void handle_cd(char **args) {
     char path[MAX_LINE];
     if (getcwd(path, sizeof(path)) != NULL) {
@@ -162,17 +152,13 @@ void handle_cd(char **args) {
 }
 
 
-// Function to implement built-in jobs command
+//jobs command
 void handle_jobs() {
     for (int i = 0; i < num_bg_processes; i++) {
         printf("%d\t%s\n", bg_processes[i].pid, bg_processes[i].command);
     }
 }
 
-// Signal handler for SIGCHLD
-// void sigchld_handler(int sig) {
-//     sigchld_received = 1;  // Set flag when SIGCHLD is received
-// }
 
 int main() {
     char line[MAX_LINE];
@@ -180,20 +166,10 @@ int main() {
 
         
     while (1) {
-        
-    //    if (sigchld_received) {
-    //         cleanup_finished_processes();  // Clean up background processes
-    //         sigchld_received = 0;          // Reset the flag
-    //     }
-      
-             
+                     
         // Print prompt
         printf("hw1shell$ ");
         fflush(stdout);
-        // Clean up any finished background processes and send notiflication 
-        
-        
-        
         
         // Read command
         
@@ -201,32 +177,32 @@ int main() {
             if (feof(stdin)) {
                 break;  // Exit on EOF
             }
-            cleanup_finished_processes();
+            clean_bg();
             continue;
         }
         
-        // Remove trailing newline
+        // remove trailing newline
         line[strcspn(line, "\n")] = 0;
         
-        // Skip empty lines
+        // skip empty lines
         if (strlen(line) == 0) {
-            cleanup_finished_processes();            
+            clean_bg();            
             continue;
         }
         
-        // Parse command
+        // parse
         int argc = parse_command(line, args);
         if (argc == 0)  {
-            cleanup_finished_processes();
+            clean_bg();
             continue;
         }
         
         
-        // Handle exit command
+        // handle exit
         if (strcmp(args[0], "exit") == 0) {
             // Wait for all background processes before exiting
             while (num_bg_processes > 0) {
-                cleanup_finished_processes();
+                clean_bg();
                 if (num_bg_processes > 0) {
                     sleep(1);  // Wait a bit before checking again
                 }
@@ -234,30 +210,30 @@ int main() {
             break;
         }
         
-        // Handle cd command
+        // handle cd
         if (strcmp(args[0], "cd") == 0) {
             handle_cd(args);
-            cleanup_finished_processes();
+            clean_bg();
             continue;
         }
         
-        // Handle jobs command
+        // handle job
         if (strcmp(args[0], "jobs") == 0) {
             handle_jobs();
-            cleanup_finished_processes();
+            clean_bg();
             continue;
         }
         
-        // Check if it's a background command
-        int is_background = is_background_command(args, argc);
+        // check if it's a background command
+        int is_background = is_bg(args, argc);
         
-        // Check if we can add another background process
+        // check if we can add another background process
         if (is_background && num_bg_processes >= MAX_BG_PROCESSES) {
             printf("hw1shell: too many background commands running\n");
             continue;
         }
         
-        // Fork a child process
+        // fork a child process
         pid_t pid = fork();
         
         if (pid < 0) {
@@ -265,29 +241,27 @@ int main() {
             continue;
         }
         
-        if (pid == 0) {  // Child process
+        if (pid == 0) { //child
             execvp(args[0], args);
-            // If execvp returns, there was an error
+            // if execvp returns then error
             printf("hw1shell: invalid command\n");
             exit(1);
-        } else {  // Parent process
+        } else {  //parent
             if (is_background) {
-                // Add to background processes array
-                if (add_background_process(pid, line) == 0) {
+                if (add_to_bg(pid, line) == 0) {
                     printf("hw1shell: pid %d started\n", pid);
                     fflush(stdout);
                 }
             } else {
-                // Wait for foreground process to complete
+                // wait foreground process completed
                 int status;
                 if (waitpid(pid, &status, 0) < 0) {
                     printf("hw1shell: waitpid failed, errno is %d\n", errno);
                 }
             }
         }
-        
         // Clean up any finished background processes
-        cleanup_finished_processes();
+        clean_bg();
     }
     
     return 0;
