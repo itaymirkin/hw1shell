@@ -7,7 +7,13 @@
 #include <errno.h>
 #include <sys/types.h>
 
+typedef struct {
+    pid_t pid;
+    char command[MAX_LINE];
+} BackgroundProcess;
 
+
+BackgroundProcess bg_processes[MAX_BG_PROCESSES];
 
 // parse command line into args
 int parse_command(char *line, char **args) {
