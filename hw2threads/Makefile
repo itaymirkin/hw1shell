@@ -1,9 +1,9 @@
 CC = gcc
-CFLAGS = -Wall -g -MMD -MP
-SRC = hw1shell.c shell.c
+CFLAGS = -Wall -g -MMD -MP -pthread
+SRC = hw2threads.c hw2threads_src.c
 OBJ = $(SRC:.c=.o)
 DEP = $(OBJ:.o=.d)
-TARGET = hw1shell
+TARGET = hw2threads
 
 # Default target to build the program
 all: $(TARGET)
