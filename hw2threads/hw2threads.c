@@ -6,16 +6,13 @@
 #include <string.h>
 #include "hw2threads_src.h"
 
-// pthread_t* worker_trds;
-pthread_mutex_t work_queue_lock;
-pthread_cond_t work_available;
-
 
 //* Globals *//
 
 int num_threads;          
 int num_counters;
 int log_enabled;
+int num_jobs_pending;
 
 int main(int argc, char *argv[]) {
     //Validate num of args
@@ -24,9 +21,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     //init main args
-    int num_threads = atoi(argv[2]);
+    int num_threads  = atoi(argv[2]);
     int num_counters = atoi(argv[3]);
-    int log_enabled = atoi(argv[4]);
+    int log_enabled  = atoi(argv[4]);
     printf("num of counters - %d \nnum of threads - %d\nlog enabled - %d\n", num_counters, num_threads, log_enabled); 
 
     //Create countes files and init them 
@@ -47,33 +44,55 @@ int main(int argc, char *argv[]) {
     
 
 
-        // Why not just define
-        pthread_t worker_trds[num_threads]; 
+    // Allocate for the number of threads
+    worker_trds =   calloc(num_threads, sizeof(pthread_t));
+    thread_status = calloc(num_threads, 1);
+    work_queue    = calloc(1, sizeof(cmd_line_s));
 
-        // worker_trds = calloc(num_threads, sizeof(pthread_t));
+    for (int i = 0; i < num_threads; i++)
+    {
+        pthread_create(&worker_trds[i], NULL, trd_func, NULL); // add Pointer with trd DATA struct to last null
+    }
 
+    /* Dispatcher Work*/
 
-        for (int i = 0; i < num_threads; i++)
-        {
-            pthread_create(&worker_trds[i], NULL, trd_func, NULL); // add Pointer with trd DATA struct to last null
+    //Parse cmd line 
+    FILE *cmdfile = fopen(argv[1], "r");
+    if (cmdfile == NULL) {
+        printf("CANT OPEN CMDFILE");
+        return 1;
+    }
+
+    char line[MAX_LINE_LENGTH];
+    cmd_line_s* cmd;
+
+    while (fgets(line, MAX_LINE_LENGTH, cmdfile)) {
+        //load a line
+        line[strcspn(line, "\n")] = '\0';
+        //Tokenize line and excute
+        printf("LINE as line : %s\n", line);
+        cmd = parse_line(line);
+        //TODO: Add logging to dispatcher.txt file
+        if (cmd->is_dispatcher == 1) {
+            if (dispatcher_cmd_exec(cmd, num_threads) == 1) return 1; //Need to check that this actually is running
         }
 
-        /* Dispatcher Work*/
+        // Offload to threads 
+        else {
+            pthread_mutex_lock(&work_queue_lock);
+            num_jobs_pending++;
 
-        //Parse cmd line 
-        FILE *cmdfile = fopen(argv[1], "r");
-        if (cmdfile == NULL) {
-            printf("CANT OPEN CMDFILE");
-            return 1;
+            // Add to work queue
+            work_queue = realloc(work_queue,num_jobs_pending * sizeof(cmd_line_s)); // Add command to the work queue
+            work_queue[num_jobs_pending-1] = *cmd; //Need to verify this is correct
+
+            pthread_cond_broadcast(&work_available);                       // Notify all threads
+            pthread_mutex_unlock(&work_queue_lock);
         }
 
-        char line[MAX_LINE_LENGTH];
-        while (fgets(line, MAX_LINE_LENGTH, cmdfile)) {
-            //loaded a line
-            line[strcspn(line, "\n")] = '\0';
-            //tokenize line and excute
-            printf("LINE as line : %s\n", line);
-            parse_line(line);
+
+
+
     }
     return 0;
 }

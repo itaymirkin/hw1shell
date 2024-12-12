@@ -16,6 +16,7 @@
 
 typedef enum {
     DIS_WAIT,
+    DIS_SLEEP,
     CMD_MSLEEP,
     CMD_INCREMENT,
     CMD_DECREMENT,
@@ -37,11 +38,24 @@ typedef struct
     char * line;        //logging
 } cmd_line_s;
 
+
+extern pthread_t* worker_trds;
+extern pthread_mutex_t work_queue_lock;
+extern pthread_cond_t work_available;
+extern int* thread_status;
+extern cmd_line_s* work_queue;
+extern int num_jobs_pending;
+
+
 void *dispatcher(void *arg);
 
-void dispatcher_wait();
+void dispatcher_wait(int num_threads);
+
+int dispatcher_cmd_exec(cmd_line_s *cmd_line, int num_threads);
 
 void *trd_func(void *arg);
+
+int basic_cmd_exec(cmd_s cmd);
 
 cmd_s parse_cmds(char *cmd_str);
 
