@@ -51,7 +51,8 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < num_threads; i++)
     {
-        pthread_create(&worker_trds[i], NULL, trd_func, NULL); // add Pointer with trd DATA struct to last null
+        int thread_id = i;
+        pthread_create(&worker_trds[i], NULL, trd_func, &thread_id); // add Pointer with trd DATA struct to last null
     }
 
     /* Dispatcher Work*/
