@@ -12,7 +12,7 @@
 int num_threads;          
 int num_counters;
 int log_enabled;
-int num_jobs_pending;
+int num_jobs_pending=0;
 
 int main(int argc, char *argv[]) {
     //Validate num of args
@@ -95,6 +95,10 @@ int main(int argc, char *argv[]) {
 
 
     }
+    // Cleanup
+    free(worker_trds);
+    free(thread_status);
+    free(work_queue);
     return 0;
 }
 
