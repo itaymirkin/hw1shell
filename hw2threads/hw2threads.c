@@ -13,6 +13,11 @@ int num_threads;
 int num_counters;
 int log_enabled;
 int num_jobs_pending = 0;
+
+pthread_mutex_t job_completion_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t all_jobs_done = PTHREAD_COND_INITIALIZER;
+int terminate_threads = 0;
+
 struct timespec program_start_time;
 
 int main(int argc, char *argv[])
@@ -58,10 +63,11 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < num_threads; i++)
     {
-        thread_args threadx;
-        threadx.thread_id = i;
-        threadx.log_enabled = log_enabled;
-        pthread_create(&worker_trds[i], NULL, trd_func, &threadx); // add Pointer with trd DATA struct to last null
+        thread_args *threadx = malloc(sizeof(thread_args));
+        //thread_args threadx;
+        threadx->thread_id = i;
+        threadx->log_enabled = log_enabled;
+        pthread_create(&worker_trds[i], NULL, trd_func, threadx); // add Pointer with trd DATA struct to last null
     }
 
     /* Dispatcher Work*/
@@ -119,8 +125,27 @@ int main(int argc, char *argv[])
 
             pthread_cond_broadcast(&work_available); // Notify all threads
             pthread_mutex_unlock(&work_queue_lock);
+             
         }
     }
+
+    pthread_mutex_lock(&job_completion_lock);
+    while (num_jobs_pending > 0) {
+        printf("herereere\n");
+        pthread_cond_wait(&all_jobs_done, &job_completion_lock);
+       
+    }
+    pthread_mutex_unlock(&job_completion_lock);
+
+    // Set terminate flag before cleanup
+    terminate_threads = 1;
+    pthread_cond_broadcast(&work_available);
+
+    // Wait for all threads to finish
+    for (int i = 0; i < num_threads; i++) {
+        pthread_join(worker_trds[i], NULL);
+    }
+
     // Cleanup
 
     // dispatcher_wait_for_all(num_threads);

@@ -10,6 +10,7 @@
 pthread_t *worker_trds;
 pthread_mutex_t work_queue_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t work_available = PTHREAD_COND_INITIALIZER;
+int all_command_read = 0;
 int *thread_status;
 cmd_line_s *work_queue;
 
@@ -82,96 +83,120 @@ void *worker(void *arg)
 // TODO: Add loggging
 void *trd_func(void *arg)
 {
-    thread_args threadx = *(thread_args *)arg;
-    int thread_id = threadx.thread_id;
-    int log_enabled = threadx.log_enabled;
+    thread_args *threadx = (thread_args*) arg;
+    int thread_id = threadx->thread_id;
+    int log_enabled = threadx->log_enabled;
     while (1)
     {
         pthread_mutex_lock(&work_queue_lock);
-
-        while (num_jobs_pending == 0)
+        if (terminate_threads && num_jobs_pending == 0) {
+            pthread_mutex_unlock(&work_queue_lock);
+            break;
+        }
+        while (num_jobs_pending == 0 && !terminate_threads)
         {
             thread_status[thread_id] = 0; // Turn off busy indication -IDLE
             pthread_cond_wait(&work_available, &work_queue_lock);
         }
 
-        thread_status[thread_id] = 1; // Turn on busy indication
+        
+         // Process a job
+        if (num_jobs_pending > 0) {
+            //cmd_line_s current_job = work_queue[0];
+            thread_status[thread_id] = 1; // Turn on busy indication
 
-        cmd_line_s cmd_line = work_queue[0];
-        long long start_time = cmd_line.start_time;
-        printf("START job - thread: %d ,time: %lld\n", thread_id, start_time);
-        printf("START job -  pending jobs: %d\n", num_jobs_pending);
-        memmove(work_queue, &work_queue[1], (num_jobs_pending - 1) * sizeof(cmd_line_s));
+            cmd_line_s cmd_line = work_queue[0];
+            long long start_time = cmd_line.start_time;
+            printf("START job - thread: %d ,time: %lld\n", thread_id, start_time);
+            printf("START job -  pending jobs: %d\n", num_jobs_pending);
+            memmove(work_queue, &work_queue[1], (num_jobs_pending - 1) * sizeof(cmd_line_s));
 
-        num_jobs_pending--;
+            num_jobs_pending--;
 
-        work_queue = realloc(work_queue, num_jobs_pending * sizeof(cmd_line_s));
+            work_queue = realloc(work_queue, num_jobs_pending * sizeof(cmd_line_s));
 
-        pthread_mutex_unlock(&work_queue_lock);
+            if (num_jobs_pending == 0) {
+                // Signal that all jobs are completed
+                pthread_mutex_lock(&job_completion_lock);
+                pthread_cond_signal(&all_jobs_done);
+                pthread_mutex_unlock(&job_completion_lock);
+            }
+            pthread_mutex_unlock(&work_queue_lock);
 
-        if (cmd_line.is_dispatcher == 1)
-        {
-            puts("Error: thread has recieved a dispatcher command\n");
-            printf("Error occured on line: %s", cmd_line.line);
-            EXIT_FAILURE;
-        }
-
-        // Iterate through the commands
-        // TODO: Need to determine of the work is done in parallel to other threads
-        for (int cmd_idx = 0; cmd_idx < cmd_line.num_of_cmds; cmd_idx++)
-        {
-            cmd_s curr_cmd = cmd_line.cmds[cmd_idx];
-            // Handle repeat command
-
-            if (curr_cmd.type == CMD_REPEAT)
+            if (cmd_line.is_dispatcher == 1)
             {
-                // Repeat the following commands accoridng to the repeat value
-                for (int rpt_idx = 0; rpt_idx < curr_cmd.value; rpt_idx++)
-                {
-                    // Iterate through the remaming commands
-                    for (int cmd_idx_rpt = cmd_idx + 1; cmd_idx_rpt < cmd_line.num_of_cmds; cmd_idx_rpt++)
-                    {
-                        int res = basic_cmd_exec(cmd_line.cmds[cmd_idx_rpt]); // TODO: Replace with single line if possible
-                        if (res != 0)
-                            EXIT_FAILURE;
-                    }
-                }
-                break; // TODO: Need to determine if after repeat the cmd finish or continues to the next commands
+                puts("Error: thread has recieved a dispatcher command\n");
+                printf("Error occured on line: %s", cmd_line.line);
+                EXIT_FAILURE;
             }
 
-            // Handle the rest of the commands
-
-            int res = basic_cmd_exec(curr_cmd); // TODO: Replace with single line if possible
-
-            if (res == 0)
-                EXIT_FAILURE;
-        }
-
-        long long end_time = get_elapsed_time(program_start_time);
-        // log to threads%id.txt file
-        printf("log_enable-%d------------------------++++++++", log_enabled);
-        if (log_enabled)
-        {
-            char log_filename[50];
-            sprintf(log_filename, "thread%02d.txt", thread_id);
-            printf("%s\n", log_filename);
-            FILE *thread_log = fopen(log_filename, "a");
-            if (thread_log == NULL)
+            // Iterate through the commands
+            // TODO: Need to determine of the work is done in parallel to other threads
+            for (int cmd_idx = 0; cmd_idx < cmd_line.num_of_cmds; cmd_idx++)
             {
-                printf("CANT OPEN thread.txt");
-                continue;
-            };
+                cmd_s curr_cmd = cmd_line.cmds[cmd_idx];
+                // Handle repeat command
 
-            fprintf(thread_log, "TIME %lld: START job %s\n", start_time, cmd_line.line);
-            fprintf(thread_log, "TIME %lld: END job %s\n", end_time, cmd_line.line);
-            fclose(thread_log);
+                if (curr_cmd.type == CMD_REPEAT)
+                {
+                    // Repeat the following commands accoridng to the repeat value
+                    for (int rpt_idx = 0; rpt_idx < curr_cmd.value; rpt_idx++)
+                    {
+                        // Iterate through the remaming commands
+                        for (int cmd_idx_rpt = cmd_idx + 1; cmd_idx_rpt < cmd_line.num_of_cmds; cmd_idx_rpt++)
+                        {
+                            int res = basic_cmd_exec(cmd_line.cmds[cmd_idx_rpt]); // TODO: Replace with single line if possible
+                            if (res != 0)
+                                EXIT_FAILURE;
+                        }
+                    }
+                    break; // TODO: Need to determine if after repeat the cmd finish or continues to the next commands
+                }
+
+                // Handle the rest of the commands
+
+                int res = basic_cmd_exec(curr_cmd); // TODO: Replace with single line if possible
+
+                if (res == 0)
+                    EXIT_FAILURE;
+            }
+
+            long long end_time = get_elapsed_time(program_start_time);
+            // log to threads%id.txt file
+            printf("log_enable-%d------------------------++++++++", log_enabled);
+            if (log_enabled)
+            {
+                char log_filename[50];
+                sprintf(log_filename, "thread%02d.txt", thread_id);
+                printf("%s\n", log_filename);
+                FILE *thread_log = fopen(log_filename, "a");
+                if (thread_log == NULL)
+                {
+                    printf("CANT OPEN thread.txt");
+                    continue;
+                };
+
+                fprintf(thread_log, "TIME %lld: START job %s\n", start_time, cmd_line.line);
+                fprintf(thread_log, "TIME %lld: END job %s\n", end_time, cmd_line.line);
+                fclose(thread_log);
+            }
+
+            long long run_time = end_time - start_time;
+            update_stats(run_time);
+            printf("END job - thread: %d ,time : %lld,run time: %lld\n", thread_id, end_time, run_time);
+            printf("END job - pending jobs: %d\n", num_jobs_pending);
+
+              
         }
-
-        long long run_time = end_time - start_time;
-        update_stats(run_time);
-        printf("END job - thread: %d ,time : %lld,run time: %lld\n", thread_id, end_time, run_time);
-        printf("END job - pending jobs: %d\n", num_jobs_pending);
-    }
+        else {
+            pthread_mutex_unlock(&work_queue_lock);
+            printf("OVER HERE");
+        }
+        
+    } 
+    printf("here");
+    free(arg);
+    return NULL;
 }
 
 // Excecute all other basic commands other than repeat
@@ -192,6 +217,7 @@ int basic_cmd_exec(cmd_s cmd)
         pthread_mutex_unlock(&work_queue_lock);
         printf("basic_cmd_exec - sleep: %d\n", val);
         usleep(val * 1000); // The function sleeps in microseconds, thus we multiply by 10^3 to get miliseconds
+         
         return 0;
     }
 
@@ -344,6 +370,7 @@ long long get_elapsed_time(struct timespec start_time)
 
 void update_stats(long long turnaround_time)
 {
+    
     pthread_mutex_lock(&stats_lock);
     total_turnaround_time += turnaround_time;
     if (turnaround_time < min_turnaround_time)

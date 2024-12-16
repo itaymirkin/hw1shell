@@ -80,4 +80,11 @@ long long get_elapsed_time(struct timespec start_time);
 void dispatcher_wait_for_all(int num_threads);
 
 void restart_logs(int num_threads);
+
+extern pthread_mutex_t job_completion_lock;
+extern pthread_cond_t all_jobs_done;
+extern int terminate_threads;
+
+// Add this function declaration
+void signal_all_jobs_completed();
 #endif // Hw2THREADS_H
