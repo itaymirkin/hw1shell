@@ -152,13 +152,18 @@ int main(int argc, char *argv[])
 
     #ifdef DEBUG_ON
         printf("\n-----------------------------------DEBUG_ON------------------------------------------\n");
-        printf("All jobs offloaded - waiting for all of the threads to terminate\n\n");    
+        printf("         All jobs offloaded - waiting for all of the threads to terminate\n\n");    
     #endif
 
     // Wait for all threads to finish
     for (int i = 0; i < num_threads; i++) {
         pthread_join(worker_trds[i], NULL);
     }
+
+    #ifdef DEBUG_ON
+        printf("\n-----------------------------------DEBUG_ON------------------------------------------\n");
+        printf("                    All Threads terminated - Starting cleanup\n\n");    
+    #endif
 
     //-----------------Cleanup-------------------
     free(worker_trds);
