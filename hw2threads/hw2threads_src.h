@@ -4,6 +4,8 @@
 #define MAX_THREADS 4096
 #define MAX_COUNTERS 100
 #define MAX_LINE_LENGTH 1024
+#define DEBUG_ON
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -67,7 +69,8 @@ int dispatcher_cmd_exec(cmd_line_s *cmd_line, int num_threads);
 
 void *trd_func(void *arg);
 
-int basic_cmd_exec(cmd_s cmd);
+
+int basic_cmd_exec(cmd_s cmd, int id);
 
 cmd_s parse_cmds(char *cmd_str);
 

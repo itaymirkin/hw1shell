@@ -38,18 +38,20 @@ int main(int argc, char *argv[])
     int num_threads = atoi(argv[2]);
     int num_counters = atoi(argv[3]);
     int log_enabled = atoi(argv[4]);
-    printf("num of counters - %d \nnum of threads - %d\nlog enabled - %d\n", num_counters, num_threads, log_enabled);
+    printf("Num of counters - %d \nNum of threads - %d\nLog enabled - %d\n", num_counters, num_threads, log_enabled);
 
     // Create countes files and init them
     char counter_filename[50];
     for (int i = 0; i < num_counters; i++)
     {
         sprintf(counter_filename, "count%02d.txt", i);
-        printf("file name - %s\n", counter_filename);
+        #ifdef DEBUG_ON
+        printf("File name - %s\n", counter_filename);
+        #endif
         FILE *f = fopen(counter_filename, "w");
         if (f == NULL)
         {
-            printf("FILE CREATION ERROR HEREs");
+            printf("Error in creating counter files\n");
             return 1;
         }
         fprintf(f, "0\n");
@@ -85,13 +87,18 @@ int main(int argc, char *argv[])
 
     restart_logs(num_threads);
 
+    #ifdef DEBUG_ON
+        printf("\n-----------------------------------DEBUG_ON------------------------------------------\n");
+        printf("               Finished Setup - Dispatcher going thorugh command file\n\n");    
+    #endif
     while (fgets(line, MAX_LINE_LENGTH, cmdfile))
     {
-
         // load a line
         line[strcspn(line, "\n")] = '\0';
         // Tokenize line and excute
-        printf("LINE as line : %s\n", line);
+        #ifdef DEBUG_ON
+            printf("Next command line: %s\n", line);
+        #endif
         cmd = parse_line(line);
         // logging to dispatcher.txt file
         if (log_enabled)
@@ -130,10 +137,12 @@ int main(int argc, char *argv[])
     }
 
     pthread_mutex_lock(&job_completion_lock);
+    #ifdef DEBUG_ON
+        printf("\n-----------------------------------DEBUG_ON------------------------------------------\n");
+        printf("Dispatcher finished reading cmd file - waiting for all jobs to be accepted by threads\n");    
+    #endif
     while (num_jobs_pending > 0) {
-        printf("herereere\n");
         pthread_cond_wait(&all_jobs_done, &job_completion_lock);
-       
     }
     pthread_mutex_unlock(&job_completion_lock);
 
@@ -141,14 +150,17 @@ int main(int argc, char *argv[])
     terminate_threads = 1;
     pthread_cond_broadcast(&work_available);
 
+    #ifdef DEBUG_ON
+        printf("\n-----------------------------------DEBUG_ON------------------------------------------\n");
+        printf("All jobs offloaded - waiting for all of the threads to terminate\n\n");    
+    #endif
+
     // Wait for all threads to finish
     for (int i = 0; i < num_threads; i++) {
         pthread_join(worker_trds[i], NULL);
     }
 
-    // Cleanup
-
-    // dispatcher_wait_for_all(num_threads);
+    //-----------------Cleanup-------------------
     free(worker_trds);
     free(thread_status);
     free(work_queue);
@@ -159,15 +171,16 @@ int main(int argc, char *argv[])
         printf("CANT OPEN stats.txt");
         return 1;
     }
+
     // Calc stats
     long long total_runtime = get_elapsed_time(program_start_time);
     double avg_turnaround_time = job_count > 0 ? (double)total_turnaround_time / job_count : 0;
     // Write stats
     fprintf(stats_file, "total running time: %lld milliseconds\n", total_runtime);
-    fprintf(stats_file, "sum of jobs turnaround time: %lld milliseconds\n", total_turnaround_time);
-    fprintf(stats_file, "min job turnaround time: %lld milliseconds\n", min_turnaround_time);
-    fprintf(stats_file, "average job turnaround time: %f milliseconds\n", avg_turnaround_time);
-    fprintf(stats_file, "max job turnaround time: %lld milliseconds\n", max_turnaround_time);
-    fprintf(stats_file, "jobs done: %d", job_count);
+    fprintf(stats_file, "Sum of jobs turnaround time: %lld milliseconds\n", total_turnaround_time);
+    fprintf(stats_file, "Min job turnaround time: %lld milliseconds\n", min_turnaround_time);
+    fprintf(stats_file, "Average job turnaround time: %f milliseconds\n", avg_turnaround_time);
+    fprintf(stats_file, "Max job turnaround time: %lld milliseconds\n", max_turnaround_time);
+    fprintf(stats_file, "Jobs done: %d", job_count);
     return 0;
 }
