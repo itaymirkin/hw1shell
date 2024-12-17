@@ -35,13 +35,13 @@ void dispatcher_wait(int num_threads)
     {
         command_in_background = 0;
         // Check if any of the threads are currently working
-        pthread_mutex_lock(&work_queue_lock);
+        // pthread_mutex_lock(&work_queue_lock);
         for (int i = 0; i < num_threads; i++)
         {
             if (thread_status[i] == 1)
                 command_in_background = 1;
         }
-        pthread_mutex_unlock(&work_queue_lock);
+        // pthread_mutex_unlock(&work_queue_lock);
         if (command_in_background == 0)
         {
             printf("dispatcher finish wait\n");
@@ -52,7 +52,6 @@ void dispatcher_wait(int num_threads)
 
 int dispatcher_cmd_exec(cmd_line_s *cmd_line, int num_threads)
 {
-
     for (int i = 0; i < cmd_line->num_of_cmds; i++)
     {
         if (cmd_line->cmds->type == DIS_WAIT)
@@ -71,21 +70,15 @@ int dispatcher_cmd_exec(cmd_line_s *cmd_line, int num_threads)
     return 0;
 }
 
-// This is not in use
-void *worker(void *arg)
-{
 
-    // Placeholder worker thread logic
-    printf("Worker thread running\n");
-    return NULL;
-}
-
-// TODO: Add loggging
 void *trd_func(void *arg)
 {
     thread_args *threadx = (thread_args*) arg;
     int thread_id = threadx->thread_id;
     int log_enabled = threadx->log_enabled;
+    #ifdef DEBUG_ON
+        printf("Thread %d created\n", thread_id);
+    #endif
     while (1)
     {
         pthread_mutex_lock(&work_queue_lock);
@@ -107,8 +100,10 @@ void *trd_func(void *arg)
 
             cmd_line_s cmd_line = work_queue[0];
             long long start_time = cmd_line.start_time;
-            printf("START job - thread: %d ,time: %lld\n", thread_id, start_time);
-            printf("START job -  pending jobs: %d\n", num_jobs_pending);
+            #ifdef DEBUG_ON
+                printf("START job - thread: %d ,time: %lld, pending jobs: %d\n", thread_id, start_time);
+            // printf("START job - pending jobs: %d\n", num_jobs_pending);
+            #endif
             memmove(work_queue, &work_queue[1], (num_jobs_pending - 1) * sizeof(cmd_line_s));
 
             num_jobs_pending--;
@@ -126,17 +121,15 @@ void *trd_func(void *arg)
             if (cmd_line.is_dispatcher == 1)
             {
                 puts("Error: thread has recieved a dispatcher command\n");
-                printf("Error occured on line: %s", cmd_line.line);
+                printf("Error occured on line: %s\n", cmd_line.line);
                 EXIT_FAILURE;
             }
 
             // Iterate through the commands
-            // TODO: Need to determine of the work is done in parallel to other threads
             for (int cmd_idx = 0; cmd_idx < cmd_line.num_of_cmds; cmd_idx++)
             {
                 cmd_s curr_cmd = cmd_line.cmds[cmd_idx];
                 // Handle repeat command
-
                 if (curr_cmd.type == CMD_REPEAT)
                 {
                     // Repeat the following commands accoridng to the repeat value
@@ -145,33 +138,32 @@ void *trd_func(void *arg)
                         // Iterate through the remaming commands
                         for (int cmd_idx_rpt = cmd_idx + 1; cmd_idx_rpt < cmd_line.num_of_cmds; cmd_idx_rpt++)
                         {
-                            int res = basic_cmd_exec(cmd_line.cmds[cmd_idx_rpt]); // TODO: Replace with single line if possible
+                            int res = basic_cmd_exec(cmd_line.cmds[cmd_idx_rpt],thread_id); // TODO: Replace with single line if possible
                             if (res != 0)
                                 EXIT_FAILURE;
                         }
                     }
                     break; // TODO: Need to determine if after repeat the cmd finish or continues to the next commands
                 }
-
                 // Handle the rest of the commands
-
-                int res = basic_cmd_exec(curr_cmd); // TODO: Replace with single line if possible
-
+                int res = basic_cmd_exec(curr_cmd, thread_id); // TODO: Replace with single line if possible
                 if (res == 0)
                     EXIT_FAILURE;
             }
-
             long long end_time = get_elapsed_time(program_start_time);
             // log to threads%id.txt file
-            printf("log_enable-%d------------------------++++++++", log_enabled);
             if (log_enabled)
             {
+                pthread_mutex_lock(&work_queue_lock);
                 char log_filename[50];
                 sprintf(log_filename, "thread%02d.txt", thread_id);
-                printf("%s\n", log_filename);
+                #ifdef DEBUG_ON
+                    printf("%s\n", log_filename);
+                #endif
                 FILE *thread_log = fopen(log_filename, "a");
                 if (thread_log == NULL)
                 {
+                    pthread_mutex_unlock(&work_queue_lock);
                     printf("CANT OPEN thread.txt");
                     continue;
                 };
@@ -179,28 +171,27 @@ void *trd_func(void *arg)
                 fprintf(thread_log, "TIME %lld: START job %s\n", start_time, cmd_line.line);
                 fprintf(thread_log, "TIME %lld: END job %s\n", end_time, cmd_line.line);
                 fclose(thread_log);
+                pthread_mutex_unlock(&work_queue_lock);
             }
-
             long long run_time = end_time - start_time;
             update_stats(run_time);
             printf("END job - thread: %d ,time : %lld,run time: %lld\n", thread_id, end_time, run_time);
-            printf("END job - pending jobs: %d\n", num_jobs_pending);
-
-              
+            printf("END job - pending jobs: %d\n", num_jobs_pending);              
         }
         else {
             pthread_mutex_unlock(&work_queue_lock);
-            printf("OVER HERE");
         }
         
     } 
-    printf("here");
+    #ifdef DEBUG_ON
+        printf("Thread %d has been terminated\n", thread_id);
+    #endif
     free(arg);
     return NULL;
 }
 
 // Excecute all other basic commands other than repeat
-int basic_cmd_exec(cmd_s cmd)
+int basic_cmd_exec(cmd_s cmd, int id)
 {
     int val = cmd.value;
     char counter_filename[50];
@@ -209,15 +200,14 @@ int basic_cmd_exec(cmd_s cmd)
 
     // While writing to the counter file we lock the thread
     pthread_mutex_lock(&work_queue_lock);
-    printf("basic_cmd_exec - type: %d, value: %d\n", cmd.type, val);
-
     // If the command is CMD_MSLEEP, execute sleep immediately
     if (cmd.type == CMD_MSLEEP)
     {
         pthread_mutex_unlock(&work_queue_lock);
-        printf("basic_cmd_exec - sleep: %d\n", val);
+        #ifdef DEBUG_ON
+            printf("Worker #%d Sleep: %d\n", id ,val);
+        #endif 
         usleep(val * 1000); // The function sleeps in microseconds, thus we multiply by 10^3 to get miliseconds
-         
         return 0;
     }
 
@@ -236,7 +226,9 @@ int basic_cmd_exec(cmd_s cmd)
     fclose(file);
 
     counter_value = strtoll(ctr_val, NULL, 10);
-    printf("basic_cmd_exec - file: %s, old count: %lld\n", counter_filename, counter_value);
+    #ifdef DEBUG_ON
+        printf("Worker #%d update counterfile: %s, old count: %lld\n", id,counter_filename, counter_value);
+    #endif
     // Open the file in append mode to add new data
     file = fopen(counter_filename, "a");
     if (file == NULL)
@@ -248,29 +240,24 @@ int basic_cmd_exec(cmd_s cmd)
 
     switch (cmd.type)
     {
-        // TODO: Confirm that sleep does not use cpu time
-    case CMD_MSLEEP:
-        printf("basic_cmd_exec - sleep: %d", val);
-        usleep(val * 1000); // The function sleeps in microseconds, thus we multiply by 10^3 to get miliseconds
-        break;
+    // case CMD_MSLEEP:
+        // printf("basic_cmd_exec - sleep: %d", val);
+        // usleep(val * 1000); // The function sleeps in microseconds, thus we multiply by 10^3 to get miliseconds
+        // break;
 
     case CMD_INCREMENT:
         counter_value++;
-        printf("basic_cmd_exec - file: %s, new count: %lld\n", counter_filename, counter_value);
         fprintf(file, "%lld\n", counter_value);
         break;
 
     case CMD_DECREMENT:
-        if (counter_value > 0)
-            counter_value--;
-        printf("basic_cmd_exec - file: %s, new count: %lld\n", counter_filename, counter_value);
+        counter_value--;
         fprintf(file, "%lld\n", counter_value);
         break;
 
     default:
         break;
     }
-
     fclose(file);
     pthread_mutex_unlock(&work_queue_lock);
     return 0;
@@ -278,10 +265,7 @@ int basic_cmd_exec(cmd_s cmd)
 
 cmd_s parse_cmds(char *cmd_str)
 {
-
     cmd_s cmd;
-
-    // char command[MAX_LINE_LENGTH];
     int value;
 
     if (sscanf(cmd_str, " msleep %d", &value) == 1)
@@ -308,8 +292,7 @@ cmd_s parse_cmds(char *cmd_str)
     return cmd;
 }
 
-// TODO: Need to add support for dispatcher sleep parsing, we handle the wait outside (already done)
-// tokenize cmd line by semi columns
+// Tokenize cmd line by semi columns
 cmd_line_s *parse_line(char *line)
 {
     cmd_line_s *cmd_line = (cmd_line_s *)malloc(sizeof(cmd_line_s));
@@ -318,13 +301,11 @@ cmd_line_s *parse_line(char *line)
     cmd_line->line = strdup(line);
     cmd_line->start_time = get_elapsed_time(program_start_time);
 
-    // TODO: Change the condition for is_dispatcher based on the dispatcher flag and not the command
 
     if (strncmp(line, "dispatcher", 10) == 0)
     {
 
         cmd_line->is_dispatcher = 1;
-        //    dispatcher_wait(); Removed
         cmd_s dis_cmd;
         if (strstr(line + 11, "wait") != NULL)
         {
