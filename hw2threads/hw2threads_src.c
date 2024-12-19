@@ -12,7 +12,7 @@ pthread_mutex_t work_queue_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t work_available = PTHREAD_COND_INITIALIZER;
 int all_command_read = 0;
 int *thread_status;
-cmd_line_s *work_queue;
+cmd_line_s **work_queue;
 
 // Define global variables here
 long long total_turnaround_time = 0;
@@ -98,17 +98,20 @@ void *trd_func(void *arg)
             //cmd_line_s current_job = work_queue[0];
             thread_status[thread_id] = 1; // Turn on busy indication
 
-            cmd_line_s cmd_line = work_queue[0];
-            long long start_time = cmd_line.start_time;
+            cmd_line_s *curr_job = work_queue[0];
+            long long start_time = curr_job->start_time;
             #ifdef DEBUG_ON
                 printf("START job - thread: %d ,time: %lld, pending jobs: %d\n", thread_id, start_time);
             // printf("START job - pending jobs: %d\n", num_jobs_pending);
             #endif
-            memmove(work_queue, &work_queue[1], (num_jobs_pending - 1) * sizeof(cmd_line_s));
-
+            // Shift remaining jobs left
+            for (int i = 0; i < num_jobs_pending - 1; i++) {
+                work_queue[i] = work_queue[i + 1];
+            }
             num_jobs_pending--;
 
-            work_queue = realloc(work_queue, num_jobs_pending * sizeof(cmd_line_s));
+            pthread_mutex_unlock(&work_queue_lock);
+            
 
             if (num_jobs_pending == 0) {
                 // Signal that all jobs are completed
@@ -118,17 +121,17 @@ void *trd_func(void *arg)
             }
             pthread_mutex_unlock(&work_queue_lock);
 
-            if (cmd_line.is_dispatcher == 1)
+            if (curr_job->is_dispatcher == 1)
             {
                 puts("Error: thread has recieved a dispatcher command\n");
-                printf("Error occured on line: %s\n", cmd_line.line);
+                printf("Error occured on line: %s\n", curr_job->line);
                 EXIT_FAILURE;
             }
 
             // Iterate through the commands
-            for (int cmd_idx = 0; cmd_idx < cmd_line.num_of_cmds; cmd_idx++)
+            for (int cmd_idx = 0; cmd_idx < curr_job->num_of_cmds; cmd_idx++)
             {
-                cmd_s curr_cmd = cmd_line.cmds[cmd_idx];
+                cmd_s curr_cmd = curr_job->cmds[cmd_idx];
                 // Handle repeat command
                 if (curr_cmd.type == CMD_REPEAT)
                 {
@@ -136,9 +139,9 @@ void *trd_func(void *arg)
                     for (int rpt_idx = 0; rpt_idx < curr_cmd.value; rpt_idx++)
                     {
                         // Iterate through the remaming commands
-                        for (int cmd_idx_rpt = cmd_idx + 1; cmd_idx_rpt < cmd_line.num_of_cmds; cmd_idx_rpt++)
+                        for (int cmd_idx_rpt = cmd_idx + 1; cmd_idx_rpt < curr_job->num_of_cmds; cmd_idx_rpt++)
                         {
-                            int res = basic_cmd_exec(cmd_line.cmds[cmd_idx_rpt],thread_id); // TODO: Replace with single line if possible
+                            int res = basic_cmd_exec(curr_job->cmds[cmd_idx_rpt],thread_id); // TODO: Replace with single line if possible
                             if (res != 0)
                                 EXIT_FAILURE;
                         }
@@ -168,8 +171,8 @@ void *trd_func(void *arg)
                     continue;
                 };
 
-                fprintf(thread_log, "TIME %lld: START job %s\n", start_time, cmd_line.line);
-                fprintf(thread_log, "TIME %lld: END job %s\n", end_time, cmd_line.line);
+                fprintf(thread_log, "TIME %lld: START job %s\n", start_time, curr_job->line);
+                fprintf(thread_log, "TIME %lld: END job %s\n", end_time, curr_job->line);
                 fclose(thread_log);
                 pthread_mutex_unlock(&work_queue_lock);
             }

@@ -60,12 +60,12 @@ int main(int argc, char *argv[])
 
     // Allocate for the number of threads
     worker_trds = calloc(num_threads, sizeof(pthread_t));
-    thread_status = calloc(num_threads, 1);
-    work_queue = calloc(1, sizeof(cmd_line_s));
+    thread_status = calloc(num_threads, sizeof(int));
+    //work_queue = calloc(1, sizeof(cmd_line_s));
 
     for (int i = 0; i < num_threads; i++)
     {
-        thread_args *threadx = malloc(sizeof(thread_args));
+        thread_args *threadx = malloc(2 * sizeof(int));
         //thread_args threadx;
         threadx->thread_id = i;
         threadx->log_enabled = log_enabled;
@@ -126,13 +126,27 @@ int main(int argc, char *argv[])
             pthread_mutex_lock(&work_queue_lock);
             num_jobs_pending++;
 
-            // Add to work queue
-            work_queue = realloc(work_queue, num_jobs_pending * sizeof(cmd_line_s)); // Add command to the work queue
-            work_queue[num_jobs_pending - 1] = *cmd;                                 // Need to verify this is correct
+            // Reallocate the queue to hold one more pointer
+            work_queue = realloc(work_queue, num_jobs_pending * sizeof(cmd_line_s*));
+            if (work_queue == NULL) {
+                fprintf(stderr, "Failed to reallocate work queue\n");
+                pthread_mutex_unlock(&work_queue_lock);
+                return 1;
+            }
 
-            pthread_cond_broadcast(&work_available); // Notify all threads
+            // Allocate space for the new command
+            work_queue[num_jobs_pending - 1] = malloc(sizeof(cmd_line_s));
+            if (work_queue[num_jobs_pending - 1] == NULL) {
+                fprintf(stderr, "Failed to allocate space for command\n");
+                pthread_mutex_unlock(&work_queue_lock);
+                return 1;
+            }
+
+            // Copy the command
+            memcpy(work_queue[num_jobs_pending - 1], cmd, sizeof(cmd_line_s));
+
+            pthread_cond_broadcast(&work_available);
             pthread_mutex_unlock(&work_queue_lock);
-             
         }
     }
 

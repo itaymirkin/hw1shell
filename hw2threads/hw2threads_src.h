@@ -50,7 +50,7 @@ extern pthread_t *worker_trds;
 extern pthread_mutex_t work_queue_lock;
 extern pthread_cond_t work_available;
 extern int *thread_status;
-extern cmd_line_s *work_queue;
+extern cmd_line_s **work_queue;
 extern int num_jobs_pending;
 
 extern struct timespec program_start_time;
