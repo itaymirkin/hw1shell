@@ -178,7 +178,7 @@ void *trd_func(void *arg)
             }
             long long run_time = end_time - start_time;
             update_stats(run_time);
-            printf("END job - thread: %d ,time : %lld,run time: %lld\n", thread_id, end_time, run_time);
+            printf("END job - thread: %d ,time : %lld, run time: %lld\n", thread_id, end_time, run_time);
             printf("END job - pending jobs: %d\n", num_jobs_pending);              
         }
         else {

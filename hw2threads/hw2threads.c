@@ -160,14 +160,14 @@ int main(int argc, char *argv[])
     }
     pthread_mutex_unlock(&job_completion_lock);
 
-    // Set terminate flag before cleanup
-    terminate_threads = 1;
-    pthread_cond_broadcast(&work_available);
-
     #ifdef DEBUG_ON
         printf("\n-----------------------------------DEBUG_ON------------------------------------------\n");
         printf("         All jobs offloaded - waiting for all of the threads to terminate\n\n");    
     #endif
+
+    // Set terminate flag before cleanup
+    terminate_threads = 1;
+    pthread_cond_broadcast(&work_available);
 
     // Wait for all threads to finish
     for (int i = 0; i < num_threads; i++) {
