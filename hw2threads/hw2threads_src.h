@@ -6,6 +6,10 @@
 #define MAX_LINE_LENGTH 1024
 #define DEBUG_ON
 
+#ifdef DEBUG_ON
+    #define LOGS_ON
+#endif
+
 
 #include <stdio.h>
 #include <stdlib.h>

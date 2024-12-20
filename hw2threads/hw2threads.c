@@ -45,9 +45,10 @@ int main(int argc, char *argv[])
     for (int i = 0; i < num_counters; i++)
     {
         sprintf(counter_filename, "count%02d.txt", i);
-        #ifdef DEBUG_ON
-        printf("File name - %s\n", counter_filename);
+        #ifdef LOGS_ON
+            printf("File name - %s\n", counter_filename);
         #endif
+        
         FILE *f = fopen(counter_filename, "w");
         if (f == NULL)
         {

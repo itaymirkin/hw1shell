@@ -102,7 +102,6 @@ void *trd_func(void *arg)
             long long start_time = curr_job->start_time;
             #ifdef DEBUG_ON
                 printf("START job - thread: %d ,time: %lld, pending jobs: %d\n", thread_id, start_time,num_jobs_pending);
-            // printf("START job - pending jobs: %d\n", num_jobs_pending);
             #endif
             // Shift remaining jobs left
             for (int i = 0; i < num_jobs_pending - 1; i++) {
@@ -160,7 +159,7 @@ void *trd_func(void *arg)
                 pthread_mutex_lock(&work_queue_lock);
                 char log_filename[50];
                 sprintf(log_filename, "thread%02d.txt", thread_id);
-                #ifdef DEBUG_ON
+                #ifdef LOGS_ON
                     printf("%s\n", log_filename);
                 #endif
                 FILE *thread_log = fopen(log_filename, "a");
@@ -178,8 +177,9 @@ void *trd_func(void *arg)
             }
             long long run_time = end_time - start_time;
             update_stats(run_time);
-            printf("END job - thread: %d ,time : %lld, run time: %lld\n", thread_id, end_time, run_time);
-            printf("END job - pending jobs: %d\n", num_jobs_pending);              
+            #ifdef DEBUG_ON
+                printf("END job - thread: %d ,time : %lld, run time: %lld, pending jobs: %d\n", thread_id, end_time, run_time, num_jobs_pending);
+            #endif
         }
         else {
             pthread_mutex_unlock(&work_queue_lock);
@@ -207,7 +207,7 @@ int basic_cmd_exec(cmd_s cmd, int id)
     if (cmd.type == CMD_MSLEEP)
     {
         pthread_mutex_unlock(&work_queue_lock);
-        #ifdef DEBUG_ON
+        #ifdef LOGS_ON
             printf("Worker #%d Sleep: %d\n", id ,val);
         #endif 
         usleep(val * 1000); // The function sleeps in microseconds, thus we multiply by 10^3 to get miliseconds
@@ -229,7 +229,7 @@ int basic_cmd_exec(cmd_s cmd, int id)
     fclose(file);
 
     counter_value = strtoll(ctr_val, NULL, 10);
-    #ifdef DEBUG_ON
+    #ifdef LOGS_ON
         printf("Worker #%d update counterfile: %s, old count: %lld\n", id,counter_filename, counter_value);
     #endif
     // Open the file in append mode to add new data
