@@ -101,7 +101,7 @@ void *trd_func(void *arg)
             cmd_line_s *curr_job = work_queue[0];
             long long start_time = curr_job->start_time;
             #ifdef DEBUG_ON
-                printf("START job - thread: %d ,time: %lld, pending jobs: %d\n", thread_id, start_time);
+                printf("START job - thread: %d ,time: %lld, pending jobs: %d\n", thread_id, start_time,num_jobs_pending);
             // printf("START job - pending jobs: %d\n", num_jobs_pending);
             #endif
             // Shift remaining jobs left
