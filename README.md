@@ -1,4 +1,4 @@
-hw2threads:
+hw2threads header file configuration:
 
 1. To show any prints from the program toggle #define DEBUG_ON.
 
