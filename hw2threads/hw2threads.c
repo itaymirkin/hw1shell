@@ -25,12 +25,14 @@ int main(int argc, char *argv[])
     // Record hw2 start time
     if (clock_gettime(CLOCK_MONOTONIC, &program_start_time) == -1)
     {
-        perror("clock_gettime failed");
+        printf("\n---------------ERROR--------------\n");
+        perror("clock_gettime failed\n");
         return 1;
     }
     // Validate num of args
     if (argc != 5)
     {
+        printf("\n---------------ERROR--------------\n");
         fprintf(stderr, "not enough args\n");
         return 1;
     }
@@ -38,8 +40,9 @@ int main(int argc, char *argv[])
     int num_threads = atoi(argv[2]);
     int num_counters = atoi(argv[3]);
     int log_enabled = atoi(argv[4]);
-    printf("Num of counters - %d \nNum of threads - %d\nLog enabled - %d\n", num_counters, num_threads, log_enabled);
-
+    #ifdef DEBUG_ON
+        printf("Num of counters - %d \nNum of threads - %d\nLog enabled - %d\n", num_counters, num_threads, log_enabled);
+    #endif
     // Create countes files and init them
     char counter_filename[50];
     for (int i = 0; i < num_counters; i++)
@@ -48,10 +51,11 @@ int main(int argc, char *argv[])
         #ifdef LOGS_ON
             printf("File name - %s\n", counter_filename);
         #endif
-        
+
         FILE *f = fopen(counter_filename, "w");
         if (f == NULL)
         {
+            printf("\n---------------ERROR--------------\n");
             printf("Error in creating counter files\n");
             return 1;
         }
@@ -60,7 +64,7 @@ int main(int argc, char *argv[])
     }
 
     // Allocate for the number of threads
-    worker_trds = calloc(num_threads, sizeof(pthread_t));
+    worker_trds   = calloc(num_threads, sizeof(pthread_t));
     thread_status = calloc(num_threads, sizeof(int));
     //work_queue = calloc(1, sizeof(cmd_line_s));
 
@@ -79,7 +83,8 @@ int main(int argc, char *argv[])
     FILE *cmdfile = fopen(argv[1], "r");
     if (cmdfile == NULL)
     {
-        printf("CANT OPEN CMDFILE");
+        printf("\n---------------ERROR--------------\n");
+        printf("CANT OPEN CMDFILE\n");
         return 1;
     }
 
@@ -107,6 +112,7 @@ int main(int argc, char *argv[])
             FILE *dispatcher_log = fopen("dispatcher.txt", "a");
             if (dispatcher_log == NULL)
             {
+                printf("\n---------------ERROR--------------\n");
                 printf("CANT OPENT dispatcher.txt");
                 return 1;
             }
@@ -130,6 +136,7 @@ int main(int argc, char *argv[])
             // Reallocate the queue to hold one more pointer
             work_queue = realloc(work_queue, num_jobs_pending * sizeof(cmd_line_s*));
             if (work_queue == NULL) {
+                printf("\n---------------ERROR--------------\n");
                 fprintf(stderr, "Failed to reallocate work queue\n");
                 pthread_mutex_unlock(&work_queue_lock);
                 return 1;
@@ -138,6 +145,7 @@ int main(int argc, char *argv[])
             // Allocate space for the new command
             work_queue[num_jobs_pending - 1] = malloc(sizeof(cmd_line_s));
             if (work_queue[num_jobs_pending - 1] == NULL) {
+                printf("\n---------------ERROR--------------\n");
                 fprintf(stderr, "Failed to allocate space for command\n");
                 pthread_mutex_unlock(&work_queue_lock);
                 return 1;
@@ -187,8 +195,9 @@ int main(int argc, char *argv[])
 
     FILE *stats_file = fopen("stats.txt", "w");
     if (stats_file == NULL)
-    {
-        printf("CANT OPEN stats.txt");
+    {   
+        printf("\n---------------ERROR--------------\n");
+        printf("CANT OPEN stats.txt\n");
         return 1;
     }
 

@@ -43,8 +43,10 @@ void dispatcher_wait(int num_threads)
         }
         // pthread_mutex_unlock(&work_queue_lock);
         if (command_in_background == 0)
-        {
-            printf("dispatcher finish wait\n");
+        {   
+            #ifdef DEBUG_ON
+                printf("Dispatcher finished wait command\n");
+            #endif
             return;
         }
     }
@@ -62,7 +64,8 @@ int dispatcher_cmd_exec(cmd_line_s *cmd_line, int num_threads)
             usleep(cmd_line->cmds->value * 1000); // The function sleeps in microseconds, thus we multiply by 10^3 to get miliseconds
         else
         {
-            puts("Error in parsing line, worker command has been passed to the dispatcher");
+            printf("\n---------------ERROR--------------\n");
+            puts("Error in parsing line, worker command has been passed to the dispatcher\n");
             printf("Error in line:\n \"%s\"", cmd_line->line);
             return 1;
         }
@@ -122,6 +125,7 @@ void *trd_func(void *arg)
 
             if (curr_job->is_dispatcher == 1)
             {
+                printf("\n---------------ERROR--------------\n");
                 puts("Error: thread has recieved a dispatcher command\n");
                 printf("Error occured on line: %s\n", curr_job->line);
                 EXIT_FAILURE;
@@ -160,13 +164,14 @@ void *trd_func(void *arg)
                 char log_filename[50];
                 sprintf(log_filename, "thread%02d.txt", thread_id);
                 #ifdef LOGS_ON
-                    printf("%s\n", log_filename);
+                    printf("Worker #%d exporting thread logs to: %s\n", thread_id, log_filename);
                 #endif
                 FILE *thread_log = fopen(log_filename, "a");
                 if (thread_log == NULL)
                 {
                     pthread_mutex_unlock(&work_queue_lock);
-                    printf("CANT OPEN thread.txt");
+                    printf("\n---------------ERROR--------------\n");
+                    printf("CANT OPEN thread.txt\n");
                     continue;
                 };
 
@@ -219,7 +224,8 @@ int basic_cmd_exec(cmd_s cmd, int id)
     if (file == NULL)
     {
         pthread_mutex_unlock(&work_queue_lock);
-        perror("Error opening file for reading");
+        printf("\n---------------ERROR--------------\n");
+        perror("Error opening file for reading\n");
         return 1;
     }
     while (fgets(ctr_val, sizeof(ctr_val), file) != NULL)
@@ -230,14 +236,15 @@ int basic_cmd_exec(cmd_s cmd, int id)
 
     counter_value = strtoll(ctr_val, NULL, 10);
     #ifdef LOGS_ON
-        printf("Worker #%d update counterfile: %s, old count: %lld\n", id,counter_filename, counter_value);
+        printf("Worker #%d update counterfile: %s, old count: %lld\n", id, counter_filename, counter_value);
     #endif
     // Open the file in append mode to add new data
     file = fopen(counter_filename, "a");
     if (file == NULL)
     {
         pthread_mutex_unlock(&work_queue_lock);
-        printf("Error opening file for writing\n");
+        printf("\n---------------ERROR--------------\n");
+        printf("Error opening file for writing\n\n");
         return 1;
     }
 
@@ -398,7 +405,8 @@ void restart_logs(int num_threads)
     FILE *dispatcher_log = fopen("dispatcher.txt", "w");
     if (dispatcher_log == NULL)
     {
-        perror("Error resetting dispatcher log");
+        printf("\n---------------ERROR--------------\n");
+        perror("Error resetting dispatcher log\n");
         return;
     }
     fclose(dispatcher_log);
@@ -412,11 +420,13 @@ void restart_logs(int num_threads)
         FILE *thread_log = fopen(thread_log_filename, "w");
         if (thread_log == NULL)
         {
-            perror("Error resetting thread log");
+            printf("\n---------------ERROR--------------\n");
+            perror("Error resetting thread log\n");
             continue;
         }
         fclose(thread_log);
     }
-
-    printf("Logs reset successfully for %d threads.\n", num_threads);
+    #ifdef DEBUG_ON
+        printf("Logs reset successfully for %d threads.\n", num_threads);
+    #endif
 }
