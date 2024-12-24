@@ -22,44 +22,77 @@ client_t clinets [MAX_CLIENTS];
 int nof_clients = 0;
 pthread_mutex_t clinets_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-handle_clinet_message(client_t *client, char *message, int len) {
-   if (message[0] == '@')
-   {
-    //Parse whisper message
-    char *whisper = strtok(message + 1, " ");
-    char whisper_reciver[NAME_SIZE];
-    char whisper_message[BUFFER_SIZE];
-    strncpy(whisper_reciver, whisper[0], NAME_SIZE);
-    strncpy(whisper_message, whisper[1], BUFFER_SIZE);
-
-    //find socket of the reciver
-    int reciver_socket = -1;
-    for (int i = 0; i < nof_clients; i++)
-    {
-        if (strcmp(clinets[i].name, whisper_reciver) == 0)
-        {
-            reciver_socket = clinets[i].socket;
+void remove_client(client_t *client) {
+    pthread_mutex_lock(&clinets_mutex);
+    char clinet_name[NAME_SIZE];
+    strncpy(clinet_name, client->name, NAME_SIZE);
+    for (int i = 0; i < nof_clients; i++) {
+        if (clinets[i].socket == client->socket) {
+            for (int j = i; j < nof_clients - 1; j++) {
+                clinets[j] = clinets[j + 1];
+            }
+            nof_clients--;
             break;
         }
     }
-    if(reciver_socket ) {
-        char format_msg[BUFFER_SIZE];
-        snprintf(format_msg, BUFFER_SIZE, "%s: %s", client->name, whisper_message);
-        send(reciver_socket, format_msg, strlen(format_msg), 0);
-    }  
+    //sprintf("client %s disconnected\n", clinet_name);
+    pthread_mutex_unlock(&clinets_mutex);
+}
+
+void handle_clinet_message(client_t *client, char *message, int len) {
+   int exit = 0;
+   if(strcmp(message, "!exit") == 0) {
+       //exit flag to remove the client at the end of the function
+       exit = 1;
+   }
+   if (message[0] == '@')
+   {
+        char *name, *msg_out;
+        // Get the first token after '@'
+        name = strtok(message, " ");  // Split at the first space
+        if (name != NULL && name[0] == '@') {
+            name++;  // Skip the '@' character
+        }
+
+        // Get the second part (msg_out)
+        msg_out = strtok(NULL, "");  // The rest of the string
+        
+        //find socket of the reciver
+        int reciver_socket = -1;
+        for (int i = 0; i < nof_clients; i++)
+        {
+            if (strcmp(clinets[i].name, name) == 0)
+            {
+                reciver_socket = clinets[i].socket;
+                break;
+            }
+        }
+        if(reciver_socket != -1) {
+            char format_msg[BUFFER_SIZE];
+            snprintf(format_msg, BUFFER_SIZE, "%s: %s", client->name, msg_out);
+            send(reciver_socket, format_msg, strlen(format_msg), 0);
+        }
+        
    }
     else {
          pthread_mutex_lock(&clinets_mutex);
          char format_msg[BUFFER_SIZE];
-         snprintf(format_msg, BUFFER_SIZE, "%s: %s", client->name, whisper_message);
-    for (int i = 0; i < nof_clients; i++) {
-        if (clinets[i].socket != client->socket) {
-            send(clinets[i].socket, message, strlen(message), 0);
+         snprintf(format_msg, BUFFER_SIZE, "%s: %s", client->name, message);
+        for (int i = 0; i < nof_clients; i++) {
+            if (clinets[i].socket != client->socket) {
+                send(clinets[i].socket, message, strlen(message), 0);
+            }
         }
-    }
-    pthread_mutex_unlock(&clinets_mutex);
+        if (exit)
+        {
+            remove_client(client);
+            close(client->socket);
+       
+        }
+        pthread_mutex_unlock(&clinets_mutex);
     } 
 };
+
 
 
 void *client_func(void* arg) {
@@ -74,16 +107,16 @@ void *client_func(void* arg) {
     }
     //Copy the name to the client struct
     strncpy(client->name, name, NAME_SIZE);
-    printf("New client %s joined from %s\n", client->name, client->ip);
+    printf("client %s connected from %s", client->name, client->ip);
     
-    //Get the message from the client
+    //Get messages from the client
     while (1) {
         int len = recv(client->socket, buffer, BUFFER_SIZE, 0);
         handle_clinet_message(client, buffer, len);
     }
 }
 
-main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
     //Open Socket
     int server_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket < 0) {
@@ -94,7 +127,7 @@ main(int argc, char *argv[]) {
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
     //Convert port number to network byte order
-    server_addr.sin_port = htons(argv[1]);
+    server_addr.sin_port = htons(atoi(argv[1]));
     //Option to bind to any address
     server_addr.sin_addr.s_addr = INADDR_ANY;
     
