@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
         }
 
         buffer[strcspn(buffer, "\n")] = '\0';
-
+        //printf("Sending: %s\n", buffer);
         //handle !exit command
         if (strcmp(buffer, "!exit") == 0) {
             printf("client exiting”\n");

@@ -35,15 +35,14 @@ void remove_client(client_t *client) {
             break;
         }
     }
-    //sprintf("client %s disconnected\n", clinet_name);
     pthread_mutex_unlock(&clients_mutex);
 }
 
 void handle_clinet_message(client_t *client, char *message, int len) {
-   int exit = 0;
+   printf("message : %s\n", message);
    if(strcmp(message, "!exit") == 0) {
-       //exit flag to remove the client at the end of the function
-       exit = 1;
+       remove_client(client);
+       close(client->socket);
    }
    if (message[0] == '@')
    {
@@ -56,7 +55,7 @@ void handle_clinet_message(client_t *client, char *message, int len) {
 
         // Get the second part (msg_out)
         msg_out = strtok(NULL, "");  // The rest of the string
-        
+        //printf("msg_out : %s\n", msg_out);
         //find socket of the reciver
         int reciver_socket = -1;
         for (int i = 0; i < nof_clients; i++)
@@ -67,27 +66,27 @@ void handle_clinet_message(client_t *client, char *message, int len) {
                 break;
             }
         }
+        char format_msg[BUFFER_SIZE];
+        memset(format_msg, 0, BUFFER_SIZE);
+        
         if(reciver_socket != -1) {
-            char format_msg[BUFFER_SIZE];
+            
             snprintf(format_msg, BUFFER_SIZE, "%s: %s", client->name, msg_out);
+            //printf("format_msg from @ case : %s\n", format_msg);
             send(reciver_socket, format_msg, strlen(format_msg), 0);
         }
         
    }
     else {
-         pthread_mutex_lock(&clients_mutex);
-         char format_msg[BUFFER_SIZE];
-         snprintf(format_msg, BUFFER_SIZE, "%s: %s", client->name, message);
+        pthread_mutex_lock(&clients_mutex);
+        char format_msg[BUFFER_SIZE];
+        memset(format_msg, 0, BUFFER_SIZE);
+        snprintf(format_msg, BUFFER_SIZE, "%s: %s", client->name, message);
+        //printf("format_msg everybody case : %s\n", format_msg);
         for (int i = 0; i < nof_clients; i++) {
             if (clients[i].socket != client->socket) {
-                send(clients[i].socket, message, strlen(message), 0);
+                send(clients[i].socket, format_msg, strlen(format_msg), 0);
             }
-        }
-        if (exit)
-        {
-            remove_client(client);
-            close(client->socket);
-       
         }
         pthread_mutex_unlock(&clients_mutex);
     } 
@@ -100,6 +99,7 @@ void *client_func(void* arg) {
     char buffer[BUFFER_SIZE];
     char name[NAME_SIZE]; 
     //get client name
+    memset(buffer, 0, BUFFER_SIZE);
     if (recv(client->socket, name, NAME_SIZE, 0) < 0) {
         perror("recv client name");
         close(client->socket);
@@ -112,7 +112,12 @@ void *client_func(void* arg) {
     //Get messages from the client
     while (1) {
         int len = recv(client->socket, buffer, BUFFER_SIZE, 0);
+        if (len <= 0) {
+            handle_clinet_message(client, "!exit", 5);
+            return NULL;
+        }
         handle_clinet_message(client, buffer, len);
+        memset(buffer, 0, BUFFER_SIZE);
     }
 }
 
