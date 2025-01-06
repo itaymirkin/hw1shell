@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
     const char *server_addr= argv[1];
     int server_port = atoi(argv[2]);
     const char *client_name = argv[3];
-    printf("Connecting to server %s:%d as '%s'.\n", server_addr, server_port, client_name);
+    //printf("Connecting to server %s:%d as '%s'.\n", server_addr, server_port, client_name); - debug
 
     // Create socket
     int client_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    printf("Connected to server as '%s'.\n", client_name);
+    //printf("Connected to server as '%s'.\n", client_name); - debug
 
     pthread_t recv_thread;
     if(pthread_create(&recv_thread, NULL, recv_func, (void *)&client_socket) != 0) {
@@ -84,18 +84,20 @@ int main(int argc, char *argv[]) {
             perror("fgets");
             break;
         }
+        
 
         buffer[strcspn(buffer, "\n")] = '\0';
-        //printf("Sending: %s\n", buffer);
+        //printf("Sending: %s\n", buffer); - debug
         //handle !exit command
         if (strcmp(buffer, "!exit") == 0) {
-            printf("client exiting”\n");
+            printf("client exiting\n");
             break;
         }
         if (send(client_socket, buffer, strlen(buffer), 0) < 0) {
             perror("send");
             break;
         }
+        
     }
 
     // Close socket
