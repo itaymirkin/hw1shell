@@ -1,10 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <pthread.h>
-#define BUFFER_SIZE 1024
+#include "hw3.h"
 void *recv_func(void *arg) {
     int client_socket = *(int *)arg;
     char buffer[BUFFER_SIZE];

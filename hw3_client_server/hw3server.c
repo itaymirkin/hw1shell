@@ -1,23 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <pthread.h>
-
-#define MAX_CLIENTS 16
-#define BUFFER_SIZE 256
-#define NAME_SIZE 256
-#define INET_ADDR_STRLEN 16
-
-typedef struct {
-    int socket;
-    char name[NAME_SIZE];
-    char ip[INET_ADDR_STRLEN];
-    char local_ip[INET_ADDR_STRLEN];
-} client_t;
+#include "hw3.h"
 
 client_t clients [MAX_CLIENTS];
 int nof_clients = 0;
