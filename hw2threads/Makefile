@@ -3,7 +3,7 @@ CFLAGS = -Wall -g -MMD -MP -pthread
 SRC = hw2threads.c hw2threads_src.c
 OBJ = $(SRC:.c=.o)
 DEP = $(OBJ:.o=.d)
-TARGET = hw2threads
+TARGET = hw2
 
 # Default target to build the program
 all: $(TARGET)
